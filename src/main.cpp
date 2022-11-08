@@ -1,54 +1,60 @@
 /************************************************** INCLUDES **************************************************/
-#include <Arduino.h>
-#include <WiFi.h>
-#include <MQUnifiedsensor.h>
-#include <ThingsBoard.h>
-#include <ArduinoUniqueID.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BME280.h>
+#include <Arduino.h>         //BIBLIOTECA COM FUNÇÕES IDE ARDUINO
+#include <WiFi.h>            //BIBLIOTECA COM FUNÇÕES DO WIFI
+#include <MQUnifiedsensor.h> //BIBLIOTECA COM FUNÇÕES PARA SENSORES DO TIPO MQ2, MQ3, MQ4, MQ5, MQ6, MQ7, MQ8, MQ9, MQ131, MQ135, MQ303A, MQ309A
+#include <ThingsBoard.h>     //BIBLIOTECA COM FUNÇÕES SERVIDOR THINGSBOARD
+#include <ArduinoUniqueID.h> //BIBLIOTECA COM FUNÇÕES PARA ADIQUIRIR NUMERO SERIAL DO MICROCONTROLADOR.
+#include <Adafruit_Sensor.h> //BIBLIOTECA COM FUNÇÕES DE SENSORES DO TIPO AIDAFRUIT
+#include <Adafruit_BME280.h> //BIBLIOTECA COM FUNÇÕES PARA O SENSOR BME280/BMP280
 
 /************************************************* DEFINIÇÕES *************************************************/
-#define TOKEN "nuQ84KS86qXFBrhJ21zO"
-#define THINGSBOARD_SERVER "thingsboard.cloud"
+#define TOKEN "nuQ84KS86qXFBrhJ21zO"           //TOKEN DO SERVIDOR THINGSBOARD
+#define THINGSBOARD_SERVER "thingsboard.cloud" //ENDEREÇO DO SERVIDOR THINGSBOARD
 
-#define placa "ESP-32"         // DEFINIR MICROCONTROLADOR PARA A BIBLIOTECA MQUNIFIEDSENSOR.H
-#define Voltage_Resolution 3.3 // TENSÃO DE REFERENCIA DO MICROCONTROLADOR USADO
-#define pin 32                 // CASO USE ARDUINO DIGITAR A0
-#define type "MQ-135"          // NOME DO SENSOR EM USO NA MQ135
-#define ADC_Bit_Resolution 12  // 10 PARA UNO/MEGA/NANO E 12 PARA ESP32 WROOM
+#define LED_LIGADO 19 // LED DE STATUS LIGADO
+#define LED_VIDA 18   // LED DE STATUS VIDA
+#define LED_WIFI 17   // LED DE STATUS WIFI
+#define LED_ERRO 16   // LED DE STATUS ERRO
+
+#define STATUS_CARREGADO_CARREGADA 5       // STATUS CARREGADOR DE BATERIA CARREGANDO
+#define STATUS_CARREGADO_CARREGANDO 23     // STATUS CARREGADOR DE BATERIA CARREGADA
+#define SENSOR_VELOCIDADE_VENTO_DIGITAL 13 // PORTA DE LIGAÇÃO DIGITAL ANEMOMETRO
+#define SENSOR_PLUVIOMETRICO_DIGITAL 27    // PORTA DE LIGAÇÃO DIGITAL PLUVIOMETRO
+#define SENSOR_SISMICO_DIGITAL 14          // PORTA DE LIGAÇÃO DIGITAL SISMOGRÁFO
+#define SENSOR_UMIDADE_SOLO_DIGITAL 26     // PORTA DE LIGAÇÃO DIGITAL UMIDADE DO SOLO
+
+#define SENSOR_SISMICO_ANALOGICO 25          // PORTA DE LIGAÇÃO ANALÓGICA SISMOGRÁFO
+#define PORTA_SENSOR_MQ135 32                // PORTA ANALÓGICA ONDE O SENSOR SERÁ LIGADO AO MICROCONTROLADOR
+#define SENSOR_ULTRAVIOLETA 33               // PORTA DE LIGAÇÃO ANALÓGICA ULTRAVIOLETA
+#define SENSOR_UMIDADE_SOLO_ANALOGICO 34     // PORTA DE LIGAÇÃO ANALÓGICA UMIDADE SOLO
+#define SENSOR_ORIENTACAO_VENTO_ANALOGICO 35 // PORTA DE LIGAÇÃO ANALÓGICA BIRUTA
+#define TENSAO_BATERIA 36                    // AQUISIÇÃO DE TENSÃO BATERIA
+// #define PORTA_SENSOR_MQ131 12                // PORTA ANALÓGICA ONDE O SENSOR SERÁ LIGADO AO MICROCONTROLADOR
+#define TENSAO_PLACA_SOLAR 39                // AQUISIÇÃO DE TENSÃO PLACA SOLAR
+
+#define PLACA "ESP-32"         // DEFINIR MICROCONTROLADOR PARA A BIBLIOTECA MQUNIFIEDSENSOR.H
+#define RESOLUCAO_VOLTAGEM 3.3 // TENSÃO DE REFERENCIA DO MICROCONTROLADOR USADO
+#define TIPO_1 "MQ-135"        // NOME DO SENSOR 1 EM USO NO CASO MQ135
+// #define TIPO_2 "MQ-131"        // NOME DO SENSOR 2 EM USO NO CASO MQ131
+#define ADC_RESOLUCAO_BIT 12   // 10 PARA UNO/MEGA/NANO E 12 PARA ESP32 WROOM
 #define RatioMQ135CleanAir 3.6 // RS / R0 = 3.6 ppm
+#define RatioMQ131CleanAir 15  // RS / R0 = 15 ppm
 
-#define TENSAO_PLACA_SOLAR 39          // AQUISIÇÃO DE TENSÃO PLACA SOLAR
-#define TENSAO_BATERIA 36              // AQUISIÇÃO DE TENSÃO BATERIA
-#define STATUS_CARREGADO_CARREGADA 5   // STATUS CARREGADOR DE BATERIA CARREGANDO
-#define STATUS_CARREGADO_CARREGANDO 23 // STATUS CARREGADOR DE BATERIA CARREGADA
-#define LED_LIGADO 19                  // LED DE STATUS LIGADO
-#define LED_VIDA 18                    // LED DE STATUS VIDA
-#define LED_WIFI 17                    // LED DE STATUS WIFI
-#define LED_ERRO 16                    // LED DE STATUS ERRO
-#define SENSOR_VELOCIDADE_VENTO_DIGITAL 13
-//#define SENSOR_VELOCIDADE_VENTO_ANALOGICO 12
-#define SENSOR_ORIENTACAO_VENTO_ANALOGICO 35
-#define SENSOR_PLUVIOMETRICO_DIGITAL 27
-#define SENSOR_SISMICO_DIGITAL 14
-#define SENSOR_SISMICO_ANALOGICO 25
-#define SENSOR_ULTRAVIOLETA 33
-#define SENSOR_UMIDADE_SOLO_ANALOGICO 34
-#define SENSOR_UMIDADE_SOLO_DIGITAL 26
-
-#define SEALEVELPRESSURE_HPA (1013.25)
+#define SEALEVELPRESSURE_HPA (1013.25) //DEFINIÇÃO DA PRESSÃO AO NIVEL DO MAR
 
 /******************************************** VARIAVEIS CONSTANTES ********************************************/
-const char *ssid = "FALANGE_SUPREMA";
-const char *password = "#kinecs#";
-const char *ntpServer = "pool.ntp.org";   // Servidor relogio mundial
-const int daylightOffset_sec = -3600 * 3; // Servidor relogio mundial segundos constantes em um dia
-const long gmtOffset_sec = 0;             // Sevidor relogio mundial GMT do Brasil
+const char *ssid = "FALANGE_SUPREMA";     // NOME DA REDE WIFI.
+const char *password = "#kinecs#";        // SENHA DA REDE WIFI.
+const char *ntpServer = "pool.ntp.org";   // SERVIDOR DE RELOGIO MUNDIAL.
+const int daylightOffset_sec = -3600 * 3; // SERVIDOR DE RELOGIO MUNDIAL SEGUNDOS CONSTANTES EM 1 DIA.
+const long gmtOffset_sec = 0;             // SERVIDOR DE RELOGIO MUNDIAL GMT DO BRASIL.
 
 /********************************************** VARIAVEIS GLOBAIS **********************************************/
-double CO2 = (0);
-float CO = 00.00, NH3 = 00.00, CH3 = 00.00, C2H6O = 00.00, C3H6O = 00.00;
+double CO2 = (0); // VARIAVEL PARA COLETAR CO DO SENSOR MQ135
+float CO = 00.00, NH3 = 00.00, CH3 = 00.00, C2H6O = 00.00, C3H6O = 00.00; // VARIAVEL PARA COLETAR GASES DO SENSOR MQ135
+// float NOX = 00.00, CL2 = 00.00, O3 = 00.00;// VARIAVEL PARA COLETAR GASES DO SENSOR MQ131
 int ID_TEMPO = 0;
+int DEBOUCE_SERVIDOR = 0;
 float TENSAO_CALCULADA = 00.00;
 float vetTensao[1000];
 float valor_medio;
@@ -60,8 +66,8 @@ float valorR1 = 30000.0;   // VALOR DO RESISTOR 1 DO DIVISOR DE TENSÃO
 float valorR2 = 7500.0;    // VALOR DO RESISTOR 2 DO DIVISOR DE TENSÃO
 int leituraSensor = 0;     // VARIÁVEL PARA ARMAZENAR A LEITURA DO PINO ANALÓGICO
 
-int rpm, CONTADOR_ATUALIZACAO_SERVER = 0, MES_ATUAL, MES_ANTERIOR, TEMPO_APRESENTA = 3000, interval = 1000, NIVEL_UV, BIRUTA, PLUVIOMETRICO, UMIDADE_SOLO, UMIDADE, PRESSAO, ALTITUDE, uvLevel;
-float VELOCIDADE_VENTO, TEMPERATURA, SISMICO;
+int rpm, CONTADOR_ATUALIZACAO_SERVER = 0, MES_ATUAL, MES_ANTERIOR, TEMPO_APRESENTA = 3000, interval = 1000, NIVEL_UV=0, BIRUTA=0, PLUVIOMETRICO=0, UMIDADE_SOLO=0, UMIDADE=0, PRESSAO=0, ALTITUDE=0, uvLevel;
+float VELOCIDADE_VENTO=00.00, TEMPERATURA=00.00, SISMICO=00.00;
 char DIRECAO_VENTO_NOMECLATURA[16][4] = {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"}; // DIREÇÃO DO VENTO
 char COND_UV[5][9] = {"BAIXO", "MODERADO", "ALTO", "ELEVADO", "EXTREMO"};                                                                     // NIVEIS DE RADIAÇÃO UV
 volatile byte pulsos;
@@ -71,7 +77,9 @@ int refLevel = 0;
 float outputVoltagem = 00.00;
 String NUMERO_SERIE = "";
 
-MQUnifiedsensor MQ135(placa, Voltage_Resolution, ADC_Bit_Resolution, pin, type);
+MQUnifiedsensor MQ135(PLACA, RESOLUCAO_VOLTAGEM, ADC_RESOLUCAO_BIT, PORTA_SENSOR_MQ135, TIPO_1); // CONFIGURAÇÃO DO SENSOR MQ135
+// MQUnifiedsensor MQ131(PLACA, RESOLUCAO_VOLTAGEM, ADC_RESOLUCAO_BIT, PORTA_SENSOR_MQ131, TIPO_2); // CONFIGURAÇÃO DO SENSOR MQ131
+
 Adafruit_BME280 bme;
 // INICIALIZANDO O CLIENTE ThingsBoard
 WiFiClient espClient;
@@ -122,10 +130,23 @@ void TENSAO(int TIPO)
   TENSAO_CALCULADA = ((((analogRead(TIPO)) * 3.27) / 4096) / (valorR2 / (valorR1 + valorR2))) * tensaoOFFSET;
 }
 
+
+/****************************************************FUNÇÕES****************************************************/
 // FUNÇÃO LÊ SENSOR MQ135
 void SENSOR_MQ135()
 {
-  MQ135.update(); // Atualiza os dados, o arduino faz a leitura da tensão no pino analógico.
+  MQ135.update(); // ATUALZA OS DADOS, MICROCONTROLADOR FAZ A LEITURA DA TENSÃO NA PORTA ANALOGICA.
+
+  /*
+      REGRESSÃO EXPONENCIAL DOS GASES MQ-135
+        GAS     |     A     |     B     |
+        CO      |   110.47  |   -2.862  |
+        CO2     |   605.18  |   -3.937  |
+        C2H6O   |   77.225  |   -3.180  |
+        CH3     |   44.947  |   -3.445  |
+        NH3     |   102.20  |   -2.473  |
+        C3H6O   |   34.668  |   -3.369  |
+    */
 
   MQ135.setA(110.47);
   MQ135.setB(-2.862);
@@ -152,6 +173,32 @@ void SENSOR_MQ135()
   C3H6O = MQ135.readSensor(); // LÊ A CONCENTRAÇÃO DE ACETONA EM PPM
 }
 
+/*
+// FUNÇÃO LÊ SENSOR MQ131
+void SENSOR_MQ131()
+{
+  MQ131.update(); // ATUALZA OS DADOS, MICROCONTROLADOR FAZ A LEITURA DA TENSÃO NA PORTA ANALOGICA.
+
+   //                     REGRESSÃO EXPONENCIAL DOS GASES MQ-131
+   //                       GAS   |     A     |     B     |
+   //                       NOx   |  -462.43  |   -2.204  |
+   //                       CL2   |   47.209  |   -1.186  |
+   //                       O3    |   23.943  |   -1.11   |
+
+
+  MQ131.setA(-462.43);
+  MQ131.setB(-2.204);
+  NOX = MQ131.readSensor(); // LÊ A CONCENTRAÇÃO DE NOX (NÚMERO DE OXIDAÇÃO) EM PPM
+
+  MQ131.setA(-462.43);
+  MQ131.setB(-2.204);
+  CL2 = MQ131.readSensor(); // LÊ A CONCENTRAÇÃO DE Cl (CLORO) EM PPM
+
+  MQ131.setA(-462.43);
+  MQ131.setB(-2.204);
+  O3 = MQ131.readSensor(); // LÊ A CONCENTRAÇÃO DE O3 (OZONIO) EM PPM
+}
+*/
 
 void contador()
 {
@@ -332,53 +379,97 @@ void PEGAR_HORA()
 void ENVIAR_PARA_SERVIDOR()
 {
   Serial.println("ENVIANDO DADOS...");
+
+  tb.sendTelemetryFloat("TEMPERATURA_AMBIENTE", TEMPERATURA); // TEMPERATURA AMBIENTE
+
+  delay(DEBOUCE_SERVIDOR);
+
+  tb.sendTelemetryInt("UMIDADE_AMBIENTE", UMIDADE); // UMIDADE RELATIVA DO AR AMBIENTE
+
+  delay(DEBOUCE_SERVIDOR);
+
+  tb.sendTelemetryInt("PRESSÃO_AMBIENTE", PRESSAO); // PRESSÃO BAROMETRICA AMBIENTE
+
+  delay(DEBOUCE_SERVIDOR);
+
+  tb.sendTelemetryInt("ALTITUDE_AMBIENTE", ALTITUDE); // ALTITUDE QUE O EQUIPAMENTO ESTA
+
+  delay(DEBOUCE_SERVIDOR);
+
   tb.sendAttributeInt("ID", ID_TEMPO); // ID DE CONTROLE DE DADOS
 
+  delay(DEBOUCE_SERVIDOR);
+
   tb.sendAttributeInt("TEMPO EXEC.", TEMPO_EXECUCAO); // TEMPO DE EXECUÇÃO DO MICROCONTROLADOR
+  
+  delay(DEBOUCE_SERVIDOR);
 
   tb.sendAttributeInt("TEMPO", millis() / 1000); // TEMPO DE FUNCIONAMENTO.
 
+  delay(DEBOUCE_SERVIDOR);
+
   tb.sendTelemetryFloat("CO", CO); // MONOXIDO DE CARBONO
+
+  delay(DEBOUCE_SERVIDOR);
 
   tb.sendTelemetryFloat("CO2", CO2); // DIOXIDO DE CARBONO
 
+  delay(DEBOUCE_SERVIDOR);
+
   tb.sendTelemetryFloat("C2H6O", C2H6O); // ETANOL
+
+  delay(DEBOUCE_SERVIDOR);
 
   tb.sendTelemetryFloat("CH3", CH3); // METIL
 
+  delay(DEBOUCE_SERVIDOR);
+
   tb.sendTelemetryFloat("NH3", NH3); // AMONIA
 
+  delay(DEBOUCE_SERVIDOR);
+
   tb.sendTelemetryFloat("C3H6O", C3H6O); // ACETONA
+
+  delay(DEBOUCE_SERVIDOR);
 
   TENSAO(TENSAO_PLACA_SOLAR);
 
   tb.sendTelemetryFloat("PLACA_SOLAR", TENSAO_CALCULADA); // TENSÃO PLACA SOLAR
 
+  delay(DEBOUCE_SERVIDOR);
+
   TENSAO(TENSAO_BATERIA);
 
   tb.sendTelemetryFloat("BATERIA", TENSAO_CALCULADA); // TENSÃO PLACA SOLAR
 
-  tb.sendTelemetryFloat("TEMPERATURA_AMBIENTE", TEMPERATURA); // TEMPERATURA AMBIENTE
-
-  tb.sendTelemetryInt("UMIDADE_AMBIENTE", UMIDADE); // UMIDADE RELATIVA DO AR AMBIENTE
-
-  tb.sendTelemetryFloat("PRESSÃO_AMBIENTE", PRESSAO); // PRESSÃO BAROMETRICA AMBIENTE
-
-  tb.sendTelemetryFloat("ALTITUDE_AMBIENTE", ALTITUDE); // ALTITUDE QUE O EQUIPAMENTO ESTA
+  delay(DEBOUCE_SERVIDOR);
 
   tb.sendTelemetryInt("UV_AMBIENTE", NIVEL_UV); // INDICE UV AMBIENTE
 
+  delay(DEBOUCE_SERVIDOR);
+
   tb.sendTelemetryFloat("ANEMOMETRO", VELOCIDADE_VENTO); // ANEMOMETRO VELOCIDADE DOS VENTOS
+
+  delay(DEBOUCE_SERVIDOR);
 
   tb.sendTelemetryFloat("DIRECAO_VENTO", mapfloat(analogRead(SENSOR_ORIENTACAO_VENTO_ANALOGICO), 0, 4095, 0, 333)); // ANEMOMETRO VELOCIDADE DOS VENTOS
 
+    delay(DEBOUCE_SERVIDOR);
+
   tb.sendTelemetryFloat("SISNOGRAFO", SISMICO); // SISMOGRAFO INTENSIDADE DE TREMORES
+
+  delay(DEBOUCE_SERVIDOR);
 
   tb.sendTelemetryInt("UMIDADE_SOLO", UMIDADE_SOLO); // UMIDADE DO SOLO
 
+  delay(DEBOUCE_SERVIDOR);
+
   tb.sendTelemetryInt("PLUVIOMETRO", PLUVIOMETRICO); // PLUVIOMETRO
 
+  delay(DEBOUCE_SERVIDOR);
+
   tb.loop();
+  
 }
 
 // FUNÇÃO ESCREVE OS DADOS NA SAIDA SERIAL
@@ -400,6 +491,7 @@ void ESCREVE_DADOS_SERIAL()
   Serial.print("BATERIA: ");
   TENSAO(TENSAO_BATERIA);
   Serial.print(TENSAO_CALCULADA);
+  //Serial.print(analogRead(TENSAO_BATERIA));
   Serial.print(" | ");
   Serial.print("CO: ");
   Serial.print(CO);
@@ -453,11 +545,14 @@ void ESCREVE_DADOS_SERIAL()
 
 void setup()
 {
-  Serial.begin(115200);
-  if (Serial)
-    Serial.println("SERIAL ABERTA!!!");
+  // SETA PORTAS COMO SAIDA
+  pinMode(LED_LIGADO, OUTPUT); // STATUS LED LIGADO
 
-  CONECTAR_WIFI();
+  digitalWrite(LED_LIGADO, HIGH);
+
+  pinMode(LED_VIDA, OUTPUT); // STATUS LED VIDA
+  pinMode(LED_WIFI, OUTPUT); // STATUS LED WIFI
+  pinMode(LED_ERRO, OUTPUT); // STATUS LED ERRO
 
   // SETA PORTAS COMO ENTRADAS
   pinMode(TENSAO_PLACA_SOLAR, INPUT);                 // SENSOR TENSÃO PLACA SOLAR
@@ -465,17 +560,16 @@ void setup()
   pinMode(STATUS_CARREGADO_CARREGANDO, INPUT_PULLUP); // STATUS BATERIA CARREGANDO VINDO DA PLACA DE CARREGAMENTO
   pinMode(STATUS_CARREGADO_CARREGADA, INPUT_PULLUP);  // STATUS BATERIA CARREGADA VINDO DA PLACA DE CARREGAMENTO
 
-  // SETA PORTAS COMO SAIDA
-  pinMode(LED_LIGADO, OUTPUT); // STATUS LED LIGADO
-  pinMode(LED_VIDA, OUTPUT);   // STATUS LED VIDA
-  pinMode(LED_WIFI, OUTPUT);   // STATUS LED WIFI
-  pinMode(LED_ERRO, OUTPUT);   // STATUS LED ERRO
-
-  digitalWrite(LED_LIGADO, HIGH);
-
   pinMode(SENSOR_VELOCIDADE_VENTO_DIGITAL, INPUT); // Pino do sensor Velocidade do vento como entrada
   pinMode(SENSOR_ULTRAVIOLETA, INPUT);             // Pino do sensor Ultravioleta como entrada
-  bme.begin(0x76);                                 // Endereço sensor BME280 0x77 ou 0x76
+
+  Serial.begin(115200);
+  if (Serial)
+    Serial.println("SERIAL ABERTA!!!");
+
+  CONECTAR_WIFI();
+
+  bme.begin(0x76); // Endereço sensor BME280 0x77 ou 0x76
   // Aciona o contador a cada pulso
   attachInterrupt(SENSOR_VELOCIDADE_VENTO_DIGITAL, contador, RISING);
   pulsos = 0;
@@ -499,53 +593,81 @@ void setup()
 
   NUMERO_SERIE.toUpperCase();
   Serial.println(NUMERO_SERIE);
-  
 
   // Defina o modelo matemático para calcular a concentração de PPM e o valor das constantes.
   MQ135.setRegressionMethod(1); //_PPM =  a*ratio^b
+  // MQ131.setRegressionMethod(1); //_PPM =  a*ratio^b
 
   /*****************************  MQ CALIBRAÇÃO ********************************************/
   MQ135.init();
-  Serial.print("CALIBRANDO SENSOR MQ135 AGUARDE.");
-  float calcR0 = 0;
+  // MQ131.init();
+
+  Serial.print("CALIBRANDO SENSOR MQ135 E MQ131 AGUARDE.");
+  float calcR0_MQ135 = 0, calcR0_MQ131 = 0;
+
   for (int i = 1; i <= 10; i++)
   {
     MQ135.update(); // Atualiza os dados, o arduino faz a leitura da tensão no pino analógico.
-    calcR0 += MQ135.calibrate(RatioMQ135CleanAir);
+    // MQ131.update();
+
+    calcR0_MQ135 += MQ135.calibrate(RatioMQ135CleanAir);
+    // calcR0_MQ131 += MQ131.calibrate(RatioMQ131CleanAir);
     Serial.print(".");
   }
-  MQ135.setR0(calcR0 / 10);
+  MQ135.setR0(calcR0_MQ135 / 10);
+  // MQ135.setR0(calcR0_MQ131 / 10);
+
   Serial.println("  CALIBRADO!.");
 
-  if (isinf(calcR0))
+  if (isinf(calcR0_MQ135))
   {
-    Serial.println("ATENÇÃO: CONEXÃO NÃO ENCOTRADA, R0 TENDENDO AO INFINITO. (CIRCUITO ABERDO DETECTADO)  CHECAR SE TEM ALIMENTAÇÃO 5V NO SENSOR");
+    Serial.println("ATENÇÃO: CONEXÃO NÃO ENCOTRADA MQ135, R0 TENDENDO AO INFINITO. (CIRCUITO ABERDO DETECTADO)  CHECAR SE TEM ALIMENTAÇÃO 5V NO SENSOR");
     digitalWrite(LED_ERRO, HIGH);
     while (1)
       ;
   }
-  if (calcR0 == 0)
+  /*
+    if (calcR0_MQ131 == 0)
+    {
+      Serial.println("ATENÇÃO: CONEXÃO NÃO ENCOTRADA MQ131, R0 É ZERO (PORTA ANALÓGICA EM CURTO COM GND) CHECAR SUAS LIGAÇÕES E ALIMENTAÇÃO.");
+      digitalWrite(LED_ERRO, HIGH);
+      while (1)
+        ;
+    }
+  */
+  if (calcR0_MQ135 == 0)
   {
-    Serial.println("ATENÇÃO: CONEXÃO NÃO ENCOTRADA, R0 É ZERO (PORTA ANALÓGICA EM CURTO COM GND) CHECAR SUAS LIGAÇÕES E ALIMENTAÇÃO.");
+    Serial.println("ATENÇÃO: CONEXÃO NÃO ENCOTRADA MQ135, R0 É ZERO (PORTA ANALÓGICA EM CURTO COM GND) CHECAR SUAS LIGAÇÕES E ALIMENTAÇÃO.");
     digitalWrite(LED_ERRO, HIGH);
     while (1)
       ;
   }
+  /*
+    if (isinf(calcR0_MQ131))
+    {
+      Serial.println("ATENÇÃO: CONEXÃO NÃO ENCOTRADA MQ131, R0 TENDENDO AO INFINITO. (CIRCUITO ABERDO DETECTADO)  CHECAR SE TEM ALIMENTAÇÃO 5V NO SENSOR");
+      digitalWrite(LED_ERRO, HIGH);
+      while (1)
+        ;
+    }*/
 
   MQ135.serialDebug(false);
+  // MQ131.serialDebug(false);
 }
 
 void loop()
 {
+  int TEMP_EXEC = 0;
+  TEMP_EXEC = millis();
   digitalWrite(LED_VIDA, HIGH);
 
   TEMPERATURA = bme.readTemperature();
-  PRESSAO = bme.readPressure()/100;
+  PRESSAO = bme.readPressure() / 100;
   UMIDADE = bme.readHumidity();
   ALTITUDE = bme.readAltitude(SEALEVELPRESSURE_HPA);
   uvLevel = averageAnalogRead(SENSOR_ULTRAVIOLETA, 8);
   refLevel = 3.26;
-  outputVoltagem = 3.3 / (refLevel * uvLevel);                 // Use os 3,3V de alimentação no pin referência para um melhor acuidade do valor de saida do sensor
+  outputVoltagem = 3.3 / (refLevel * uvLevel);              // Use os 3,3V de alimentação no pin referência para um melhor acuidade do valor de saida do sensor
   NIVEL_UV = mapfloat(outputVoltagem, 0.0, 3.3, 0.0, 15.0); // Convert the voltage to a UV intensity level
   // Atualiza contador a cada segundo
   if (millis() - timeold >= 1000)
@@ -571,24 +693,26 @@ void loop()
       if (!tb.connect(THINGSBOARD_SERVER, TOKEN))
       {
         Serial.println("FALHA AO SE CONECTAR");
-       digitalWrite(LED_ERRO, HIGH);
+        digitalWrite(LED_ERRO, HIGH);
         return;
       }
       digitalWrite(LED_ERRO, LOW);
     }
 
-    SENSOR_MQ135(); // LÊ OS GASES NO AMBIENTE
+    SENSOR_MQ135(); // LÊ OS GASES NO AMBIENTE MQ-135
+                    // SENSOR_MQ131(); //LÊ OS GASES NO AMBIENTE MQ-131
 
-    int TEMP_EXEC = 0;
-    TEMP_EXEC = millis();
 
-    ESCREVE_DADOS_SERIAL(); // ESXREVE OS DADOS NA SAIDA SERIAL
 
     ENVIAR_PARA_SERVIDOR(); // ENVIA DADOS PARA O SERVIDOR
 
+    ESCREVE_DADOS_SERIAL(); // ESXREVE OS DADOS NA SAIDA SERIAL
+
+
+
     digitalWrite(LED_LIGADO, LOW);
 
-    delay(1000); // FREQUÊNCIA DE AMOSTRAGEM
+    delay(10000); // FREQUÊNCIA DE AMOSTRAGEM
     ID_TEMPO++;
     CONTADOR_ID++;
     TEMPO_EXECUCAO = millis() - TEMP_EXEC;
