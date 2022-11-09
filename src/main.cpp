@@ -8,8 +8,8 @@
 #include <Adafruit_BME280.h> //BIBLIOTECA COM FUNÇÕES PARA O SENSOR BME280/BMP280
 
 /************************************************* DEFINIÇÕES *************************************************/
-#define TOKEN "nuQ84KS86qXFBrhJ21zO"           //TOKEN DO SERVIDOR THINGSBOARD
-#define THINGSBOARD_SERVER "thingsboard.cloud" //ENDEREÇO DO SERVIDOR THINGSBOARD
+#define TOKEN "nuQ84KS86qXFBrhJ21zO"           // TOKEN DO SERVIDOR THINGSBOARD
+#define THINGSBOARD_SERVER "thingsboard.cloud" // ENDEREÇO DO SERVIDOR THINGSBOARD
 
 #define LED_LIGADO 19 // LED DE STATUS LIGADO
 #define LED_VIDA 18   // LED DE STATUS VIDA
@@ -30,7 +30,7 @@
 #define SENSOR_ORIENTACAO_VENTO_ANALOGICO 35 // PORTA DE LIGAÇÃO ANALÓGICA BIRUTA
 #define TENSAO_BATERIA 36                    // AQUISIÇÃO DE TENSÃO BATERIA
 // #define PORTA_SENSOR_MQ131 12                // PORTA ANALÓGICA ONDE O SENSOR SERÁ LIGADO AO MICROCONTROLADOR
-#define TENSAO_PLACA_SOLAR 39                // AQUISIÇÃO DE TENSÃO PLACA SOLAR
+#define TENSAO_PLACA_SOLAR 39 // AQUISIÇÃO DE TENSÃO PLACA SOLAR
 
 #define PLACA "ESP-32"         // DEFINIR MICROCONTROLADOR PARA A BIBLIOTECA MQUNIFIEDSENSOR.H
 #define RESOLUCAO_VOLTAGEM 3.3 // TENSÃO DE REFERENCIA DO MICROCONTROLADOR USADO
@@ -40,7 +40,7 @@
 #define RatioMQ135CleanAir 3.6 // RS / R0 = 3.6 ppm
 #define RatioMQ131CleanAir 15  // RS / R0 = 15 ppm
 
-#define SEALEVELPRESSURE_HPA (1013.25) //DEFINIÇÃO DA PRESSÃO AO NIVEL DO MAR
+#define SEALEVELPRESSURE_HPA (1013.25) // DEFINIÇÃO DA PRESSÃO AO NIVEL DO MAR
 
 /******************************************** VARIAVEIS CONSTANTES ********************************************/
 const char *ssid = "FALANGE_SUPREMA";     // NOME DA REDE WIFI.
@@ -50,7 +50,7 @@ const int daylightOffset_sec = -3600 * 3; // SERVIDOR DE RELOGIO MUNDIAL SEGUNDO
 const long gmtOffset_sec = 0;             // SERVIDOR DE RELOGIO MUNDIAL GMT DO BRASIL.
 
 /********************************************** VARIAVEIS GLOBAIS **********************************************/
-double CO2 = (0); // VARIAVEL PARA COLETAR CO DO SENSOR MQ135
+double CO2 = (0);                                                         // VARIAVEL PARA COLETAR CO DO SENSOR MQ135
 float CO = 00.00, NH3 = 00.00, CH3 = 00.00, C2H6O = 00.00, C3H6O = 00.00; // VARIAVEL PARA COLETAR GASES DO SENSOR MQ135
 // float NOX = 00.00, CL2 = 00.00, O3 = 00.00;// VARIAVEL PARA COLETAR GASES DO SENSOR MQ131
 int ID_TEMPO = 0;
@@ -60,19 +60,23 @@ float vetTensao[1000];
 float valor_medio;
 int CONTADOR_ID = 1;
 int TEMPO_EXECUCAO = 0;
-float tensaoEntrada = 0.0; // VARIÁVEL PARA ARMAZENAR O VALOR DE TENSÃO DE ENTRADA DO SENSOR
-float tensaoMedida = 0.0;  // VARIÁVEL PARA ARMAZENAR O VALOR DA TENSÃO MEDIDA PELO SENSOR
-float valorR1 = 30000.0;   // VALOR DO RESISTOR 1 DO DIVISOR DE TENSÃO
-float valorR2 = 7500.0;    // VALOR DO RESISTOR 2 DO DIVISOR DE TENSÃO
-int leituraSensor = 0;     // VARIÁVEL PARA ARMAZENAR A LEITURA DO PINO ANALÓGICO
+float tensaoEntrada = 0.0;     // VARIÁVEL PARA ARMAZENAR O VALOR DE TENSÃO DE ENTRADA DO SENSOR
+float tensaoMedida = 0.0;      // VARIÁVEL PARA ARMAZENAR O VALOR DA TENSÃO MEDIDA PELO SENSOR
+float valorR1 = 30000.0;       // VALOR DO RESISTOR 1 DO DIVISOR DE TENSÃO
+float valorR2 = 7500.0;        // VALOR DO RESISTOR 2 DO DIVISOR DE TENSÃO
+int leituraSensor = 0;         // VARIÁVEL PARA ARMAZENAR A LEITURA DO PINO ANALÓGICO
+float MAGNITUDE_ABALO = 00.00; // VARIÁVEL PARA AMARZENAMENTO DA LEITURA DO ABALO SISMICO
 
-int rpm, CONTADOR_ATUALIZACAO_SERVER = 0, MES_ATUAL, MES_ANTERIOR, TEMPO_APRESENTA = 3000, interval = 1000, NIVEL_UV=0, BIRUTA=0, PLUVIOMETRICO=0, UMIDADE_SOLO=0, UMIDADE=0, PRESSAO=0, ALTITUDE=0, uvLevel;
-float VELOCIDADE_VENTO=00.00, TEMPERATURA=00.00, SISMICO=00.00;
+int RPM = 0, FREQUENCIA_ABALO = 0, CONTADOR_ATUALIZACAO_SERVER = 0, MES_ATUAL, MES_ANTERIOR, TEMPO_APRESENTA = 3000, interval = 1000, NIVEL_UV = 0, BIRUTA = 0, PLUVIOMETRICO = 0, UMIDADE_SOLO = 0, UMIDADE = 0, PRESSAO = 0, ALTITUDE = 0, uvLevel;
+float VELOCIDADE_VENTO = 00.00, TEMPERATURA = 00.00, SISMICO = 00.00;
 char DIRECAO_VENTO_NOMECLATURA[16][4] = {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"}; // DIREÇÃO DO VENTO
-char COND_UV[5][9] = {"BAIXO", "MODERADO", "ALTO", "ELEVADO", "EXTREMO"};                                                                     // NIVEIS DE RADIAÇÃO UV
+char COND_UV[5][9] = {"BAIXO", "MODERADO", "ALTO", "ELEVADO", "EXTREMO"};
+// NIVEIS DE RADIAÇÃO UV
 volatile byte pulsos;
+volatile byte pulsos_2;
 unsigned long timeold;
 unsigned int pulsos_por_volta = 20; // Altere o numero de acordo com o disco encoder
+unsigned int FREQUENCIA_ABALO_MAX = 1;
 int refLevel = 0;
 float outputVoltagem = 00.00;
 String NUMERO_SERIE = "";
@@ -129,7 +133,6 @@ void TENSAO(int TIPO)
   }
   TENSAO_CALCULADA = ((((analogRead(TIPO)) * 3.27) / 4096) / (valorR2 / (valorR1 + valorR2))) * tensaoOFFSET;
 }
-
 
 /****************************************************FUNÇÕES****************************************************/
 // FUNÇÃO LÊ SENSOR MQ135
@@ -199,10 +202,14 @@ void SENSOR_MQ131()
   O3 = MQ131.readSensor(); // LÊ A CONCENTRAÇÃO DE O3 (OZONIO) EM PPM
 }
 */
-
 void contador()
 {
   pulsos++; // Incrementa contador
+}
+
+void contador_2()
+{
+  pulsos_2++; // Incrementa contador
 }
 
 // função que faz uma média de leituras em umA determinadA porta e retorna a média
@@ -401,7 +408,7 @@ void ENVIAR_PARA_SERVIDOR()
   delay(DEBOUCE_SERVIDOR);
 
   tb.sendAttributeInt("TEMPO EXEC.", TEMPO_EXECUCAO); // TEMPO DE EXECUÇÃO DO MICROCONTROLADOR
-  
+
   delay(DEBOUCE_SERVIDOR);
 
   tb.sendAttributeInt("TEMPO", millis() / 1000); // TEMPO DE FUNCIONAMENTO.
@@ -454,7 +461,7 @@ void ENVIAR_PARA_SERVIDOR()
 
   tb.sendTelemetryFloat("DIRECAO_VENTO", mapfloat(analogRead(SENSOR_ORIENTACAO_VENTO_ANALOGICO), 0, 4095, 0, 333)); // ANEMOMETRO VELOCIDADE DOS VENTOS
 
-    delay(DEBOUCE_SERVIDOR);
+  delay(DEBOUCE_SERVIDOR);
 
   tb.sendTelemetryFloat("SISNOGRAFO", SISMICO); // SISMOGRAFO INTENSIDADE DE TREMORES
 
@@ -469,7 +476,6 @@ void ENVIAR_PARA_SERVIDOR()
   delay(DEBOUCE_SERVIDOR);
 
   tb.loop();
-  
 }
 
 // FUNÇÃO ESCREVE OS DADOS NA SAIDA SERIAL
@@ -491,7 +497,7 @@ void ESCREVE_DADOS_SERIAL()
   Serial.print("BATERIA: ");
   TENSAO(TENSAO_BATERIA);
   Serial.print(TENSAO_CALCULADA);
-  //Serial.print(analogRead(TENSAO_BATERIA));
+  // Serial.print(analogRead(TENSAO_BATERIA));
   Serial.print(" | ");
   Serial.print("CO: ");
   Serial.print(CO);
@@ -572,8 +578,10 @@ void setup()
   bme.begin(0x76); // Endereço sensor BME280 0x77 ou 0x76
   // Aciona o contador a cada pulso
   attachInterrupt(SENSOR_VELOCIDADE_VENTO_DIGITAL, contador, RISING);
+  attachInterrupt(SENSOR_SISMICO_ANALOGICO, contador_2, RISING);
   pulsos = 0;
-  rpm = 0;
+  pulsos_2 = 0;
+  RPM = 0;
   VELOCIDADE_VENTO = 0;
   timeold = 0;
 
@@ -673,11 +681,18 @@ void loop()
   if (millis() - timeold >= 1000)
   {
     detachInterrupt(SENSOR_VELOCIDADE_VENTO_DIGITAL);                     // Desabilita interrupcao durante o calculo
-    rpm = (60 * 1000 / pulsos_por_volta) / (millis() - timeold) * pulsos; // RPM do sensor
-    VELOCIDADE_VENTO = ((((2 * 3.6) * 3, 14) * 1.3) * rpm) / 60, 0;       // converte RPM em Km/h
+    detachInterrupt(SENSOR_SISMICO_ANALOGICO);                            // Desabilita interrupcao durante o calculo
+    RPM = (60 * 1000 / pulsos_por_volta) / (millis() - timeold) * pulsos; // RPM do sensor
+    VELOCIDADE_VENTO = ((((2 * 3.6) * 3, 14) * 1.3) * RPM) / 60, 0;       // converte RPM em Km/h
+
+    FREQUENCIA_ABALO = (60 * 1000 / FREQUENCIA_ABALO_MAX) / (millis() - timeold) * pulsos_2; // RPM do sensor
+    MAGNITUDE_ABALO = ((((2 * 3.6) * 3, 14) * 1.3) * FREQUENCIA_ABALO) / 60, 0;              // converte RPM em Km/h
+
     timeold = millis();
     pulsos = 0;
-    attachInterrupt(SENSOR_VELOCIDADE_VENTO_DIGITAL, contador, RISING); // Habilita interrupcao
+    pulsos_2 = 0;
+    attachInterrupt(SENSOR_VELOCIDADE_VENTO_DIGITAL, contador, RISING); // Habilita interrupcao anemometro
+    attachInterrupt(SENSOR_SISMICO_ANALOGICO, contador_2, RISING);      // Habilita interrupcao sismografo
     if (WiFi.status() != WL_CONNECTED)
     {
       digitalWrite(LED_WIFI, LOW);
@@ -702,13 +717,11 @@ void loop()
     SENSOR_MQ135(); // LÊ OS GASES NO AMBIENTE MQ-135
                     // SENSOR_MQ131(); //LÊ OS GASES NO AMBIENTE MQ-131
 
-
+    UMIDADE_SOLO = mapfloat(analogRead(SENSOR_UMIDADE_SOLO_ANALOGICO), 0, 4095, 0, 100);
 
     ENVIAR_PARA_SERVIDOR(); // ENVIA DADOS PARA O SERVIDOR
 
     ESCREVE_DADOS_SERIAL(); // ESXREVE OS DADOS NA SAIDA SERIAL
-
-
 
     digitalWrite(LED_LIGADO, LOW);
 
