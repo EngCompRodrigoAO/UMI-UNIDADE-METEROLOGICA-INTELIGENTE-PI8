@@ -67,16 +67,15 @@ float valorR2 = 7500.0;        // VALOR DO RESISTOR 2 DO DIVISOR DE TENSÃO
 int leituraSensor = 0;         // VARIÁVEL PARA ARMAZENAR A LEITURA DO PINO ANALÓGICO
 float MAGNITUDE_ABALO = 00.00; // VARIÁVEL PARA AMARZENAMENTO DA LEITURA DO ABALO SISMICO
 
-int RPM = 0, FREQUENCIA_ABALO = 0, CONTADOR_ATUALIZACAO_SERVER = 0, MES_ATUAL, MES_ANTERIOR, TEMPO_APRESENTA = 3000, interval = 1000, NIVEL_UV = 0, BIRUTA = 0, PLUVIOMETRICO = 0, UMIDADE_SOLO = 0, UMIDADE = 0, PRESSAO = 0, ALTITUDE = 0, uvLevel;
-float VELOCIDADE_VENTO = 00.00, TEMPERATURA = 00.00, SISMICO = 00.00;
+int RPM = 0, CONTADOR_ATUALIZACAO_SERVER = 0, MES_ATUAL, MES_ANTERIOR, TEMPO_APRESENTA = 3000, interval = 1000, NIVEL_UV = 0, BIRUTA = 0, PLUVIOMETRICO = 0, UMIDADE_SOLO = 0, UMIDADE = 0, PRESSAO = 0, ALTITUDE = 0, uvLevel;
+float VELOCIDADE_VENTO = 00.00, TEMPERATURA = 00.00, FREQUENCIA_ABALO = 00.00;
 char DIRECAO_VENTO_NOMECLATURA[16][4] = {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"}; // DIREÇÃO DO VENTO
 char COND_UV[5][9] = {"BAIXO", "MODERADO", "ALTO", "ELEVADO", "EXTREMO"};
 // NIVEIS DE RADIAÇÃO UV
 volatile byte pulsos;
-volatile byte pulsos_2;
+volatile byte FREQUENCIA_SISMICA;
 unsigned long timeold;
 unsigned int pulsos_por_volta = 20; // Altere o numero de acordo com o disco encoder
-unsigned int FREQUENCIA_ABALO_MAX = 1;
 int refLevel = 0;
 float outputVoltagem = 00.00;
 String NUMERO_SERIE = "";
@@ -207,9 +206,9 @@ void contador()
   pulsos++; // Incrementa contador
 }
 
-void contador_2()
+void IRAM_ATTR ABALO_SISMICO()
 {
-  pulsos_2++; // Incrementa contador
+  FREQUENCIA_SISMICA++;
 }
 
 // função que faz uma média de leituras em umA determinadA porta e retorna a média
@@ -463,7 +462,7 @@ void ENVIAR_PARA_SERVIDOR()
 
   delay(DEBOUCE_SERVIDOR);
 
-  tb.sendTelemetryFloat("SISNOGRAFO", SISMICO); // SISMOGRAFO INTENSIDADE DE TREMORES
+  tb.sendTelemetryFloat("SISNOGRAFO", FREQUENCIA_SISMICA); // SISMOGRAFO INTENSIDADE DE TREMORES
 
   delay(DEBOUCE_SERVIDOR);
 
@@ -539,7 +538,10 @@ void ESCREVE_DADOS_SERIAL()
   Serial.print(mapfloat(analogRead(SENSOR_ORIENTACAO_VENTO_ANALOGICO), 0, 4095, 0, 333));
   Serial.print(" | ");
   Serial.print("SISMOGRAFO: ");
-  Serial.print(SISMICO);
+  Serial.print(FREQUENCIA_SISMICA);
+  Serial.print(" | ");
+  Serial.print("SISMOGRAFO ANALOGICO: ");
+  Serial.print(MAGNITUDE_ABALO);
   Serial.print(" | ");
   Serial.print("UMIDADE_SOLO: ");
   Serial.print(UMIDADE_SOLO);
@@ -567,7 +569,10 @@ void setup()
   pinMode(STATUS_CARREGADO_CARREGADA, INPUT_PULLUP);  // STATUS BATERIA CARREGADA VINDO DA PLACA DE CARREGAMENTO
 
   pinMode(SENSOR_VELOCIDADE_VENTO_DIGITAL, INPUT); // Pino do sensor Velocidade do vento como entrada
-  pinMode(SENSOR_ULTRAVIOLETA, INPUT);             // Pino do sensor Ultravioleta como entrada
+ //pinMode(SENSOR_SISMICO_DIGITAL, INPUT);
+  //pinMode(SENSOR_SISMICO_ANALOGICO,INPUT);
+  pinMode(SENSOR_ULTRAVIOLETA, INPUT); // Pino do sensor Ultravioleta como entrada
+
 
   Serial.begin(115200);
   if (Serial)
@@ -578,9 +583,8 @@ void setup()
   bme.begin(0x76); // Endereço sensor BME280 0x77 ou 0x76
   // Aciona o contador a cada pulso
   attachInterrupt(SENSOR_VELOCIDADE_VENTO_DIGITAL, contador, RISING);
-  attachInterrupt(SENSOR_SISMICO_ANALOGICO, contador_2, RISING);
+  //attachInterrupt(SENSOR_SISMICO_DIGITAL, ABALO_SISMICO, CHANGE);
   pulsos = 0;
-  pulsos_2 = 0;
   RPM = 0;
   VELOCIDADE_VENTO = 0;
   timeold = 0;
@@ -681,18 +685,12 @@ void loop()
   if (millis() - timeold >= 1000)
   {
     detachInterrupt(SENSOR_VELOCIDADE_VENTO_DIGITAL);                     // Desabilita interrupcao durante o calculo
-    detachInterrupt(SENSOR_SISMICO_ANALOGICO);                            // Desabilita interrupcao durante o calculo
     RPM = (60 * 1000 / pulsos_por_volta) / (millis() - timeold) * pulsos; // RPM do sensor
     VELOCIDADE_VENTO = ((((2 * 3.6) * 3, 14) * 1.3) * RPM) / 60, 0;       // converte RPM em Km/h
 
-    FREQUENCIA_ABALO = (60 * 1000 / FREQUENCIA_ABALO_MAX) / (millis() - timeold) * pulsos_2; // RPM do sensor
-    MAGNITUDE_ABALO = ((((2 * 3.6) * 3, 14) * 1.3) * FREQUENCIA_ABALO) / 60, 0;              // converte RPM em Km/h
-
     timeold = millis();
     pulsos = 0;
-    pulsos_2 = 0;
     attachInterrupt(SENSOR_VELOCIDADE_VENTO_DIGITAL, contador, RISING); // Habilita interrupcao anemometro
-    attachInterrupt(SENSOR_SISMICO_ANALOGICO, contador_2, RISING);      // Habilita interrupcao sismografo
     if (WiFi.status() != WL_CONNECTED)
     {
       digitalWrite(LED_WIFI, LOW);
@@ -716,8 +714,9 @@ void loop()
 
     SENSOR_MQ135(); // LÊ OS GASES NO AMBIENTE MQ-135
                     // SENSOR_MQ131(); //LÊ OS GASES NO AMBIENTE MQ-131
+    FREQUENCIA_ABALO += mapfloat(2.57, 0.0, 3.3, 0.0, 10000.0);
 
-    UMIDADE_SOLO = mapfloat(analogRead(SENSOR_UMIDADE_SOLO_ANALOGICO), 0, 4095, 0, 100);
+    UMIDADE_SOLO = mapfloat(analogRead(SENSOR_UMIDADE_SOLO_ANALOGICO), 0, 4095, 100, 0);
 
     ENVIAR_PARA_SERVIDOR(); // ENVIA DADOS PARA O SERVIDOR
 
@@ -729,5 +728,6 @@ void loop()
     ID_TEMPO++;
     CONTADOR_ID++;
     TEMPO_EXECUCAO = millis() - TEMP_EXEC;
+    FREQUENCIA_ABALO = 0;
   }
 }
