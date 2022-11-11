@@ -1,3 +1,27 @@
+/* FALTA FAZER
+
+1 - VERIFICAR ROTINA DOS LEDS POIS ESTA INCONSISTENTE
+
+2 - ADD BOTÃO VIRTUAL DE RESET ESP
+
+3 - OK - ADD ROTINA DE TRATAMENTO DE ERRO BME280 VALORES FUNDO DE ESCALA: ALTITUDE: 2147483647 , UMIDADE_AMBIENTE: 214783647,  PRESSÃO_AMBIENTE: 2147483647
+
+4 - ADD BOTÃO VIRTUAL CALIBRAÇÃO SENSORES
+
+5 - ADD ROTINA DE CALIBRAÇÃO SENSOR ANEMOMETRO
+
+6 - ADD ROTINA DE CALIBRAÇÃO SENSOR BME-280
+
+7 - CRIAR INTERRUPÇÃO PARA OS SENSORES PLUVIOMETRICO DIGITAL, SENSOR SISMICO.
+
+8 - CRIAR SOFTWARE PWM PARA CALIBRAR O SENSOR ANEMOMETRO
+
+9 - CRIAR DASHBOARD NO THINGSBOARD PARA CALIBRAÇÃO E ACESSO A BOTORES E GRAFICOS
+
+10 -
+
+*/
+
 /************************************************** INCLUDES **************************************************/
 #include <Arduino.h>         //BIBLIOTECA COM FUNÇÕES IDE ARDUINO
 #include <WiFi.h>            //BIBLIOTECA COM FUNÇÕES DO WIFI
@@ -16,8 +40,8 @@
 #define LED_WIFI 17   // LED DE STATUS WIFI
 #define LED_ERRO 16   // LED DE STATUS ERRO
 
-#define STATUS_CARREGADO_CARREGADA 5       // STATUS CARREGADOR DE BATERIA CARREGANDO
-#define STATUS_CARREGADO_CARREGANDO 23     // STATUS CARREGADOR DE BATERIA CARREGADA
+#define STATUS_USANDO_BATERIA 5            // LED DE CONTROLE CIRCUITO DE CARREGAMENTO DE BATERIA
+#define STATUS_PLACA_SOLAR 23              // LED DE CONTROLE CIRCUITO DA PLACA SOLAR
 #define SENSOR_VELOCIDADE_VENTO_DIGITAL 13 // PORTA DE LIGAÇÃO DIGITAL ANEMOMETRO
 #define SENSOR_PLUVIOMETRICO_DIGITAL 27    // PORTA DE LIGAÇÃO DIGITAL PLUVIOMETRO
 #define SENSOR_SISMICO_DIGITAL 14          // PORTA DE LIGAÇÃO DIGITAL SISMOGRÁFO
@@ -49,8 +73,9 @@ const char *ntpServer = "pool.ntp.org";   // SERVIDOR DE RELOGIO MUNDIAL.
 const int daylightOffset_sec = -3600 * 3; // SERVIDOR DE RELOGIO MUNDIAL SEGUNDOS CONSTANTES EM 1 DIA.
 const long gmtOffset_sec = 0;             // SERVIDOR DE RELOGIO MUNDIAL GMT DO BRASIL.
 
-/********************************************** VARIAVEIS GLOBAIS **********************************************/
-double CO2 = (0);                                                         // VARIAVEL PARA COLETAR CO DO SENSOR MQ135
+const int FUNDO_ESCALA_BME280 = 2147483647; // FUNDO DE ESCALA SENSOR BME-280
+    /********************************************** VARIAVEIS GLOBAIS **********************************************/
+    double CO2 = (0);                                                     // VARIAVEL PARA COLETAR CO DO SENSOR MQ135
 float CO = 00.00, NH3 = 00.00, CH3 = 00.00, C2H6O = 00.00, C3H6O = 00.00; // VARIAVEL PARA COLETAR GASES DO SENSOR MQ135
 // float NOX = 00.00, CL2 = 00.00, O3 = 00.00;// VARIAVEL PARA COLETAR GASES DO SENSOR MQ131
 int ID_TEMPO = 0;
@@ -66,14 +91,18 @@ float valorR1 = 30000.0;       // VALOR DO RESISTOR 1 DO DIVISOR DE TENSÃO
 float valorR2 = 7500.0;        // VALOR DO RESISTOR 2 DO DIVISOR DE TENSÃO
 int leituraSensor = 0;         // VARIÁVEL PARA ARMAZENAR A LEITURA DO PINO ANALÓGICO
 float MAGNITUDE_ABALO = 00.00; // VARIÁVEL PARA AMARZENAMENTO DA LEITURA DO ABALO SISMICO
-
-int RPM = 0, CONTADOR_ATUALIZACAO_SERVER = 0, MES_ATUAL, MES_ANTERIOR, TEMPO_APRESENTA = 3000, interval = 1000, NIVEL_UV = 0, BIRUTA = 0, PLUVIOMETRICO = 0, UMIDADE_SOLO = 0, UMIDADE = 0, PRESSAO = 0, ALTITUDE = 0, uvLevel;
+float QUANTIDADE_DE_ML_POR_PULSO = 4.1, AREA_CAPTACAO_AGUA = 19855.64;
+int CONTADOR_PLUVIOMETRICO = 0;
+int STATUS_ENVIO = 0;
+int RPM = 0,
+    CONTADOR_ATUALIZACAO_SERVER = 0, MES_ATUAL, MES_ANTERIOR, TEMPO_APRESENTA = 3000, interval = 1000, NIVEL_UV = 0, BIRUTA = 0, PLUVIOMETRICO = 0, UMIDADE_SOLO = 0, UMIDADE = 0, PRESSAO = 0, ALTITUDE = 0, uvLevel;
 float VELOCIDADE_VENTO = 00.00, TEMPERATURA = 00.00, FREQUENCIA_ABALO = 00.00;
 char DIRECAO_VENTO_NOMECLATURA[16][4] = {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"}; // DIREÇÃO DO VENTO
 char COND_UV[5][9] = {"BAIXO", "MODERADO", "ALTO", "ELEVADO", "EXTREMO"};
 // NIVEIS DE RADIAÇÃO UV
 volatile byte pulsos;
 volatile byte FREQUENCIA_SISMICA;
+volatile byte PULSO_PLUVIOMETRICO;
 unsigned long timeold;
 unsigned int pulsos_por_volta = 20; // Altere o numero de acordo com o disco encoder
 int refLevel = 0;
@@ -175,8 +204,8 @@ void SENSOR_MQ135()
   C3H6O = MQ135.readSensor(); // LÊ A CONCENTRAÇÃO DE ACETONA EM PPM
 }
 
-/*
 // FUNÇÃO LÊ SENSOR MQ131
+/*
 void SENSOR_MQ131()
 {
   MQ131.update(); // ATUALZA OS DADOS, MICROCONTROLADOR FAZ A LEITURA DA TENSÃO NA PORTA ANALOGICA.
@@ -201,14 +230,14 @@ void SENSOR_MQ131()
   O3 = MQ131.readSensor(); // LÊ A CONCENTRAÇÃO DE O3 (OZONIO) EM PPM
 }
 */
-void contador()
+void IRAM_ATTR contador()
 {
   pulsos++; // Incrementa contador
 }
 
-void IRAM_ATTR ABALO_SISMICO()
+void IRAM_ATTR CONTADOR_CHUVA()
 {
-  FREQUENCIA_SISMICA++;
+  PULSO_PLUVIOMETRICO++;
 }
 
 // função que faz uma média de leituras em umA determinadA porta e retorna a média
@@ -384,102 +413,77 @@ void PEGAR_HORA()
 // FUÇÃO ENVIA PARA SERVIDOR DADOS
 void ENVIAR_PARA_SERVIDOR()
 {
+
   Serial.println("ENVIANDO DADOS...");
 
   tb.sendTelemetryFloat("TEMPERATURA_AMBIENTE", TEMPERATURA); // TEMPERATURA AMBIENTE
 
-  delay(DEBOUCE_SERVIDOR);
-
   tb.sendTelemetryInt("UMIDADE_AMBIENTE", UMIDADE); // UMIDADE RELATIVA DO AR AMBIENTE
-
-  delay(DEBOUCE_SERVIDOR);
 
   tb.sendTelemetryInt("PRESSÃO_AMBIENTE", PRESSAO); // PRESSÃO BAROMETRICA AMBIENTE
 
-  delay(DEBOUCE_SERVIDOR);
-
   tb.sendTelemetryInt("ALTITUDE_AMBIENTE", ALTITUDE); // ALTITUDE QUE O EQUIPAMENTO ESTA
-
-  delay(DEBOUCE_SERVIDOR);
 
   tb.sendAttributeInt("ID", ID_TEMPO); // ID DE CONTROLE DE DADOS
 
-  delay(DEBOUCE_SERVIDOR);
-
   tb.sendAttributeInt("TEMPO EXEC.", TEMPO_EXECUCAO); // TEMPO DE EXECUÇÃO DO MICROCONTROLADOR
-
-  delay(DEBOUCE_SERVIDOR);
 
   tb.sendAttributeInt("TEMPO", millis() / 1000); // TEMPO DE FUNCIONAMENTO.
 
-  delay(DEBOUCE_SERVIDOR);
-
   tb.sendTelemetryFloat("CO", CO); // MONOXIDO DE CARBONO
-
-  delay(DEBOUCE_SERVIDOR);
 
   tb.sendTelemetryFloat("CO2", CO2); // DIOXIDO DE CARBONO
 
-  delay(DEBOUCE_SERVIDOR);
-
   tb.sendTelemetryFloat("C2H6O", C2H6O); // ETANOL
-
-  delay(DEBOUCE_SERVIDOR);
 
   tb.sendTelemetryFloat("CH3", CH3); // METIL
 
-  delay(DEBOUCE_SERVIDOR);
-
   tb.sendTelemetryFloat("NH3", NH3); // AMONIA
 
-  delay(DEBOUCE_SERVIDOR);
-
   tb.sendTelemetryFloat("C3H6O", C3H6O); // ACETONA
-
-  delay(DEBOUCE_SERVIDOR);
 
   TENSAO(TENSAO_PLACA_SOLAR);
 
   tb.sendTelemetryFloat("PLACA_SOLAR", TENSAO_CALCULADA); // TENSÃO PLACA SOLAR
 
-  delay(DEBOUCE_SERVIDOR);
-
   TENSAO(TENSAO_BATERIA);
 
   tb.sendTelemetryFloat("BATERIA", TENSAO_CALCULADA); // TENSÃO PLACA SOLAR
 
-  delay(DEBOUCE_SERVIDOR);
-
   tb.sendTelemetryInt("UV_AMBIENTE", NIVEL_UV); // INDICE UV AMBIENTE
-
-  delay(DEBOUCE_SERVIDOR);
 
   tb.sendTelemetryFloat("ANEMOMETRO", VELOCIDADE_VENTO); // ANEMOMETRO VELOCIDADE DOS VENTOS
 
-  delay(DEBOUCE_SERVIDOR);
-
-  tb.sendTelemetryFloat("DIRECAO_VENTO", mapfloat(analogRead(SENSOR_ORIENTACAO_VENTO_ANALOGICO), 0, 4095, 0, 333)); // ANEMOMETRO VELOCIDADE DOS VENTOS
-
-  delay(DEBOUCE_SERVIDOR);
+  tb.sendTelemetryFloat("DIRECAO_VENTO", mapfloat(analogRead(SENSOR_ORIENTACAO_VENTO_ANALOGICO), 0, 4095, 0, 359)); // ANEMOMETRO VELOCIDADE DOS VENTOS
 
   tb.sendTelemetryFloat("SISNOGRAFO", FREQUENCIA_SISMICA); // SISMOGRAFO INTENSIDADE DE TREMORES
 
-  delay(DEBOUCE_SERVIDOR);
-
   tb.sendTelemetryInt("UMIDADE_SOLO", UMIDADE_SOLO); // UMIDADE DO SOLO
-
-  delay(DEBOUCE_SERVIDOR);
 
   tb.sendTelemetryInt("PLUVIOMETRO", PLUVIOMETRICO); // PLUVIOMETRO
 
-  delay(DEBOUCE_SERVIDOR);
+  tb.sendAttributeBool("LED_LIGADO", digitalRead(LED_LIGADO)); // LED STATUS
+
+  tb.sendAttributeBool("LED_VIDA", digitalRead(LED_VIDA)); // LED STATUS
+
+  tb.sendAttributeBool("LED_WIFI", digitalRead(LED_WIFI)); // LED STATUS
+
+  tb.sendAttributeBool("LED_ERRO", digitalRead(LED_ERRO)); // LED STATUS
+
+  tb.sendAttributeBool("LED_PLACA_SOLAR", digitalRead(STATUS_PLACA_SOLAR)); // LED STATUS
+
+  tb.sendAttributeBool("LED_BATERIA", digitalRead(STATUS_USANDO_BATERIA)); // LED STATUS
 
   tb.loop();
+  delay(50);
 }
 
 // FUNÇÃO ESCREVE OS DADOS NA SAIDA SERIAL
 void ESCREVE_DADOS_SERIAL()
 {
+  Serial.print("ID_EQUIPAMENTO: ");
+  Serial.print(NUMERO_SERIE);
+  Serial.print("  |  ");
   Serial.print("ID: ");
   Serial.print(ID_TEMPO);
   Serial.print("  |  ");
@@ -535,7 +539,7 @@ void ESCREVE_DADOS_SERIAL()
   Serial.print(VELOCIDADE_VENTO);
   Serial.print(" | ");
   Serial.print("DIRECAO_VENTO: ");
-  Serial.print(mapfloat(analogRead(SENSOR_ORIENTACAO_VENTO_ANALOGICO), 0, 4095, 0, 333));
+  Serial.print(mapfloat(analogRead(SENSOR_ORIENTACAO_VENTO_ANALOGICO), 0, 4095, 0, 359));
   Serial.print(" | ");
   Serial.print("SISMOGRAFO: ");
   Serial.print(FREQUENCIA_SISMICA);
@@ -548,68 +552,43 @@ void ESCREVE_DADOS_SERIAL()
   Serial.print(" | ");
   Serial.print("PLUVIOMETRO: ");
   Serial.print(PLUVIOMETRICO);
+  Serial.print(" | ");
+  Serial.print("USO_PAINEL_SOLAR: ");
+  Serial.print(digitalRead(STATUS_PLACA_SOLAR));
+  Serial.print(" | ");
+  Serial.print("USO_BATERIA: ");
+  Serial.print(digitalRead(STATUS_USANDO_BATERIA));
   Serial.println(";");
 }
 
-void setup()
+// FUNÇÃO PARA TRATAMENTO DE ERROS
+void TRATA_ERROS(int PULSOS_LED, int ESPACO_TEMPO)
 {
-  // SETA PORTAS COMO SAIDA
-  pinMode(LED_LIGADO, OUTPUT); // STATUS LED LIGADO
-
-  digitalWrite(LED_LIGADO, HIGH);
-
-  pinMode(LED_VIDA, OUTPUT); // STATUS LED VIDA
-  pinMode(LED_WIFI, OUTPUT); // STATUS LED WIFI
-  pinMode(LED_ERRO, OUTPUT); // STATUS LED ERRO
-
-  // SETA PORTAS COMO ENTRADAS
-  pinMode(TENSAO_PLACA_SOLAR, INPUT);                 // SENSOR TENSÃO PLACA SOLAR
-  pinMode(TENSAO_BATERIA, INPUT);                     // SENSOR TENSÃO BATERIA
-  pinMode(STATUS_CARREGADO_CARREGANDO, INPUT_PULLUP); // STATUS BATERIA CARREGANDO VINDO DA PLACA DE CARREGAMENTO
-  pinMode(STATUS_CARREGADO_CARREGADA, INPUT_PULLUP);  // STATUS BATERIA CARREGADA VINDO DA PLACA DE CARREGAMENTO
-
-  pinMode(SENSOR_VELOCIDADE_VENTO_DIGITAL, INPUT); // Pino do sensor Velocidade do vento como entrada
- //pinMode(SENSOR_SISMICO_DIGITAL, INPUT);
-  //pinMode(SENSOR_SISMICO_ANALOGICO,INPUT);
-  pinMode(SENSOR_ULTRAVIOLETA, INPUT); // Pino do sensor Ultravioleta como entrada
-
-
-  Serial.begin(115200);
-  if (Serial)
-    Serial.println("SERIAL ABERTA!!!");
-
-  CONECTAR_WIFI();
-
-  bme.begin(0x76); // Endereço sensor BME280 0x77 ou 0x76
-  // Aciona o contador a cada pulso
-  attachInterrupt(SENSOR_VELOCIDADE_VENTO_DIGITAL, contador, RISING);
-  //attachInterrupt(SENSOR_SISMICO_DIGITAL, ABALO_SISMICO, CHANGE);
-  pulsos = 0;
-  RPM = 0;
-  VELOCIDADE_VENTO = 0;
-  timeold = 0;
-
-  // UniqueIDdump(Serial);
-  NUMERO_SERIE = "MCUDEVICE-";
-  // Serial.print("UniqueID: ");
-  for (size_t i = 0; i < UniqueIDsize; i++)
+  for (int x; x <= PULSOS_LED; x++)
   {
-    if (UniqueID[i] < 0x10)
-      Serial.print("0");
-
-    // Serial.print(UniqueID[i], HEX);
-    NUMERO_SERIE += String(UniqueID[i], HEX);
-    // Serial.print("");
+    digitalWrite(LED_ERRO, HIGH);
+    delay(ESPACO_TEMPO);
   }
-  Serial.println();
+}
 
-  NUMERO_SERIE.toUpperCase();
-  Serial.println(NUMERO_SERIE);
+// FUÇÃO PARA LEITURA E TRATAMENTO DO SENSOR PLUVIOMETRICO
+void NIVEL_PLUVIOMETRICO()
+{
+  if (CONTADOR_PLUVIOMETRICO <= 3600)
+  {
+    // PLUVIOMETRICO += digitalRead(SENSOR_PLUVIOMETRICO_DIGITAL);
+    PLUVIOMETRICO = PULSO_PLUVIOMETRICO * ((1000 / AREA_CAPTACAO_AGUA) / QUANTIDADE_DE_ML_POR_PULSO);
+    CONTADOR_PLUVIOMETRICO++;
+  }
+  else
+  {
+    CONTADOR_PLUVIOMETRICO = 0;
+  }
+}
 
-  // Defina o modelo matemático para calcular a concentração de PPM e o valor das constantes.
-  MQ135.setRegressionMethod(1); //_PPM =  a*ratio^b
-  // MQ131.setRegressionMethod(1); //_PPM =  a*ratio^b
-
+// CALIBRAÇÃO SENSORES MQ
+void CALIBRACAO_SENSORES_MQ()
+{
   /*****************************  MQ CALIBRAÇÃO ********************************************/
   MQ135.init();
   // MQ131.init();
@@ -634,7 +613,9 @@ void setup()
   if (isinf(calcR0_MQ135))
   {
     Serial.println("ATENÇÃO: CONEXÃO NÃO ENCOTRADA MQ135, R0 TENDENDO AO INFINITO. (CIRCUITO ABERDO DETECTADO)  CHECAR SE TEM ALIMENTAÇÃO 5V NO SENSOR");
-    digitalWrite(LED_ERRO, HIGH);
+    TRATA_ERROS(10, 500);
+    delay(10000);
+    ESP.restart();
     while (1)
       ;
   }
@@ -642,7 +623,9 @@ void setup()
     if (calcR0_MQ131 == 0)
     {
       Serial.println("ATENÇÃO: CONEXÃO NÃO ENCOTRADA MQ131, R0 É ZERO (PORTA ANALÓGICA EM CURTO COM GND) CHECAR SUAS LIGAÇÕES E ALIMENTAÇÃO.");
-      digitalWrite(LED_ERRO, HIGH);
+      TRATA_ERROS(9, 500);
+          delay(10000);
+    ESP.restart();
       while (1)
         ;
     }
@@ -650,7 +633,9 @@ void setup()
   if (calcR0_MQ135 == 0)
   {
     Serial.println("ATENÇÃO: CONEXÃO NÃO ENCOTRADA MQ135, R0 É ZERO (PORTA ANALÓGICA EM CURTO COM GND) CHECAR SUAS LIGAÇÕES E ALIMENTAÇÃO.");
-    digitalWrite(LED_ERRO, HIGH);
+    TRATA_ERROS(8, 500);
+    delay(10000);
+    ESP.restart();
     while (1)
       ;
   }
@@ -658,7 +643,9 @@ void setup()
     if (isinf(calcR0_MQ131))
     {
       Serial.println("ATENÇÃO: CONEXÃO NÃO ENCOTRADA MQ131, R0 TENDENDO AO INFINITO. (CIRCUITO ABERDO DETECTADO)  CHECAR SE TEM ALIMENTAÇÃO 5V NO SENSOR");
-      digitalWrite(LED_ERRO, HIGH);
+      TRATA_ERROS(7, 500);
+      delay(10000);
+      ESP.restart();
       while (1)
         ;
     }*/
@@ -667,20 +654,156 @@ void setup()
   // MQ131.serialDebug(false);
 }
 
+// FUNÇÃO LEITURA DOS DADOS MODULO 1
+void MODULO_1_LEITURA()
+{
+
+//*************BME280
+  TEMPERATURA = bme.readTemperature();
+
+  PRESSAO = bme.readPressure() / 100;
+
+  UMIDADE = bme.readHumidity();
+
+  ALTITUDE = bme.readAltitude(SEALEVELPRESSURE_HPA);
+
+if(PRESSAO==FUNDO_ESCALA_BME280 || UMIDADE==FUNDO_ESCALA_BME280 || ALTITUDE==FUNDO_ESCALA_BME280)
+{
+  Serial.println("");
+  Serial.println("!!!!! -----  *****  ATENCAO SENSOR BME280 MODULO 1 COM PROBLEMA!!! ***** ----- !!!!!");
+  Serial.print("EQUIPAMENO SERA REINICIADO! EM 2 SEGUNDO");
+  TRATA_ERROS(10,200);
+  ESP.restart();
+}
+//**************ULTRAVIOLETA
+  uvLevel = averageAnalogRead(SENSOR_ULTRAVIOLETA, 8);
+
+  refLevel = 3.26;
+
+  outputVoltagem = 3.3 / (refLevel * uvLevel); // Use os 3,3V de alimentação no pin referência para um melhor acuidade do valor de saida do sensor
+
+  NIVEL_UV = mapfloat(outputVoltagem, 0.0, 3.3, 0.0, 15.0); // Convert the voltage to a UV intensity level
+
+  //******************** GASES
+  SENSOR_MQ135(); // LÊ OS GASES NO AMBIENTE MQ-135
+
+  // SENSOR_MQ131(); //LÊ OS GASES NO AMBIENTE MQ-131
+}
+
+
+// FUNÇÃO PARA TESTAR INTERFACE
+void TESTE_INTERFACE()
+{
+  digitalWrite(LED_LIGADO, HIGH);
+  delay(5000);
+  digitalWrite(LED_LIGADO, LOW);
+  delay(1000);
+
+  digitalWrite(LED_VIDA, HIGH);
+  delay(5000);
+  digitalWrite(LED_VIDA, LOW);
+  delay(1000);
+
+  digitalWrite(LED_WIFI, HIGH);
+  delay(5000);
+  digitalWrite(LED_WIFI, LOW);
+  delay(1000);
+
+  digitalWrite(LED_ERRO, HIGH);
+  delay(5000);
+  digitalWrite(LED_ERRO, LOW);
+  delay(1000);
+
+  digitalWrite(LED_LIGADO, HIGH);
+  digitalWrite(LED_VIDA, HIGH);
+  digitalWrite(LED_WIFI, HIGH);
+  digitalWrite(LED_ERRO, HIGH);
+  delay(5000);
+  digitalWrite(LED_LIGADO, LOW);
+  digitalWrite(LED_VIDA, LOW);
+  digitalWrite(LED_WIFI, LOW);
+  digitalWrite(LED_ERRO, LOW);
+  delay(1000);
+}
+
+void setup()
+{
+  // SETA PORTAS COMO SAIDA
+  pinMode(LED_LIGADO, OUTPUT); // STATUS LED LIGADO
+
+  digitalWrite(LED_LIGADO, HIGH);
+
+  pinMode(LED_VIDA, OUTPUT); // STATUS LED VIDA
+  pinMode(LED_WIFI, OUTPUT); // STATUS LED WIFI
+  pinMode(LED_ERRO, OUTPUT); // STATUS LED ERRO
+
+  TESTE_INTERFACE();
+
+  digitalWrite(LED_VIDA, LOW);
+  digitalWrite(LED_WIFI, LOW);
+  digitalWrite(LED_ERRO, LOW);
+
+  // SETA PORTAS COMO ENTRADAS
+  pinMode(TENSAO_PLACA_SOLAR, INPUT);           // SENSOR TENSÃO PLACA SOLAR
+  pinMode(TENSAO_BATERIA, INPUT);               // SENSOR TENSÃO BATERIA
+  pinMode(STATUS_PLACA_SOLAR, INPUT_PULLUP);    // STATUS BATERIA CARREGANDO VINDO DA PLACA DE CARREGAMENTO
+  pinMode(STATUS_USANDO_BATERIA, INPUT_PULLUP); // STATUS BATERIA CARREGADA VINDO DA PLACA DE CARREGAMENTO
+
+  pinMode(SENSOR_VELOCIDADE_VENTO_DIGITAL, INPUT); // Pino do sensor Velocidade do vento como entrada
+  // pinMode(SENSOR_SISMICO_DIGITAL, INPUT);
+  // pinMode(SENSOR_SISMICO_ANALOGICO,INPUT);
+  pinMode(SENSOR_ULTRAVIOLETA, INPUT); // Pino do sensor Ultravioleta como entrada
+  pinMode(SENSOR_PLUVIOMETRICO_DIGITAL, INPUT);
+
+  Serial.begin(115200);
+  if (Serial)
+    Serial.println("SERIAL ABERTA!!!");
+
+  // Defina o modelo matemático para calcular a concentração de PPM e o valor das constantes.
+  MQ135.setRegressionMethod(1); //_PPM =  a*ratio^b
+
+  // MQ131.setRegressionMethod(1); //_PPM =  a*ratio^b
+
+  CALIBRACAO_SENSORES_MQ();
+
+  CONECTAR_WIFI();
+
+  bme.begin(0x76); // Endereço sensor BME280 0x77 ou 0x76
+  // Aciona o contador a cada pulso
+  attachInterrupt(SENSOR_VELOCIDADE_VENTO_DIGITAL, contador, RISING);
+  // attachInterrupt(SENSOR_SISMICO_DIGITAL, ABALO_SISMICO, CHANGE);
+  attachInterrupt(SENSOR_PLUVIOMETRICO_DIGITAL, CONTADOR_CHUVA, CHANGE);
+  pulsos = 0;
+  RPM = 0;
+  VELOCIDADE_VENTO = 0;
+  timeold = 0;
+
+  // UniqueIDdump(Serial);
+  NUMERO_SERIE = "MCUDEVICE-";
+  // Serial.print("UniqueID: ");
+  for (size_t i = 0; i < UniqueIDsize; i++)
+  {
+    if (UniqueID[i] < 0x10)
+      Serial.print("0");
+
+    // Serial.print(UniqueID[i], HEX);
+    NUMERO_SERIE += String(UniqueID[i], HEX);
+    // Serial.print("");
+  }
+  Serial.println();
+
+  NUMERO_SERIE.toUpperCase();
+
+  Serial.println(NUMERO_SERIE);
+}
+
 void loop()
 {
+  // digitalWrite(LED_LIGADO, HIGH);
   int TEMP_EXEC = 0;
   TEMP_EXEC = millis();
   digitalWrite(LED_VIDA, HIGH);
 
-  TEMPERATURA = bme.readTemperature();
-  PRESSAO = bme.readPressure() / 100;
-  UMIDADE = bme.readHumidity();
-  ALTITUDE = bme.readAltitude(SEALEVELPRESSURE_HPA);
-  uvLevel = averageAnalogRead(SENSOR_ULTRAVIOLETA, 8);
-  refLevel = 3.26;
-  outputVoltagem = 3.3 / (refLevel * uvLevel);              // Use os 3,3V de alimentação no pin referência para um melhor acuidade do valor de saida do sensor
-  NIVEL_UV = mapfloat(outputVoltagem, 0.0, 3.3, 0.0, 15.0); // Convert the voltage to a UV intensity level
   // Atualiza contador a cada segundo
   if (millis() - timeold >= 1000)
   {
@@ -698,6 +821,8 @@ void loop()
     }
     if (!tb.connected())
     {
+      digitalWrite(LED_WIFI, HIGH);
+
       // CONECTANDO A SERVIDOR THINGSBOARD
       Serial.print("CONECTANDO A: ");
       Serial.print(THINGSBOARD_SERVER);
@@ -706,28 +831,42 @@ void loop()
       if (!tb.connect(THINGSBOARD_SERVER, TOKEN))
       {
         Serial.println("FALHA AO SE CONECTAR");
-        digitalWrite(LED_ERRO, HIGH);
+        TRATA_ERROS(20, 50);
         return;
       }
       digitalWrite(LED_ERRO, LOW);
     }
 
-    SENSOR_MQ135(); // LÊ OS GASES NO AMBIENTE MQ-135
-                    // SENSOR_MQ131(); //LÊ OS GASES NO AMBIENTE MQ-131
-    FREQUENCIA_ABALO += mapfloat(2.57, 0.0, 3.3, 0.0, 10000.0);
+    MODULO_1_LEITURA();
+
+
+
+    FREQUENCIA_ABALO += mapfloat(1.15, 0.0, 3.3, 0.0, 10.0);
 
     UMIDADE_SOLO = mapfloat(analogRead(SENSOR_UMIDADE_SOLO_ANALOGICO), 0, 4095, 100, 0);
 
-    ENVIAR_PARA_SERVIDOR(); // ENVIA DADOS PARA O SERVIDOR
+    NIVEL_PLUVIOMETRICO();
+    if (STATUS_ENVIO == 2)
+    {
+      ENVIAR_PARA_SERVIDOR(); // ENVIA DADOS PARA O SERVIDOR
+      ESCREVE_DADOS_SERIAL(); // ESXREVE OS DADOS NA SAIDA SERIAL
+      STATUS_ENVIO = 0;
+    }
+    else
+    {
+      ESCREVE_DADOS_SERIAL(); // ESXREVE OS DADOS NA SAIDA SERIAL
+      STATUS_ENVIO++;
+    }
 
-    ESCREVE_DADOS_SERIAL(); // ESXREVE OS DADOS NA SAIDA SERIAL
+    delay(1000); // FREQUÊNCIA DE AMOSTRAGEM
 
-    digitalWrite(LED_LIGADO, LOW);
-
-    delay(10000); // FREQUÊNCIA DE AMOSTRAGEM
     ID_TEMPO++;
+
     CONTADOR_ID++;
+
     TEMPO_EXECUCAO = millis() - TEMP_EXEC;
+
     FREQUENCIA_ABALO = 0;
+    digitalWrite(LED_VIDA, LOW);
   }
 }
