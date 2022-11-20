@@ -1,27 +1,3 @@
-/* FALTA FAZER
-
-1 - VERIFICAR ROTINA DOS LEDS POIS ESTA INCONSISTENTE
-
-2 - ADD BOTÃO VIRTUAL DE RESET ESP
-
-3 - OK - ADD ROTINA DE TRATAMENTO DE ERRO BME280 VALORES FUNDO DE ESCALA: ALTITUDE: 2147483647 , UMIDADE_AMBIENTE: 214783647,  PRESSÃO_AMBIENTE: 2147483647
-
-4 - ADD BOTÃO VIRTUAL CALIBRAÇÃO SENSORES
-
-5 - ADD ROTINA DE CALIBRAÇÃO SENSOR ANEMOMETRO
-
-6 - ADD ROTINA DE CALIBRAÇÃO SENSOR BME-280
-
-7 - CRIAR INTERRUPÇÃO PARA OS SENSORES PLUVIOMETRICO DIGITAL, SENSOR SISMICO.
-
-8 - CRIAR SOFTWARE PWM PARA CALIBRAR O SENSOR ANEMOMETRO
-
-9 - CRIAR DASHBOARD NO THINGSBOARD PARA CALIBRAÇÃO E ACESSO A BOTORES E GRAFICOS
-
-10 -
-
-*/
-
 /************************************************** INCLUDES **************************************************/
 #include <Arduino.h>         //BIBLIOTECA COM FUNÇÕES IDE ARDUINO
 #include <WiFi.h>            //BIBLIOTECA COM FUNÇÕES DO WIFI
@@ -74,8 +50,9 @@ const int daylightOffset_sec = -3600 * 3; // SERVIDOR DE RELOGIO MUNDIAL SEGUNDO
 const long gmtOffset_sec = 0;             // SERVIDOR DE RELOGIO MUNDIAL GMT DO BRASIL.
 
 const int FUNDO_ESCALA_BME280 = 2147483647; // FUNDO DE ESCALA SENSOR BME-280
-    /********************************************** VARIAVEIS GLOBAIS **********************************************/
-    double CO2 = (0);                                                     // VARIAVEL PARA COLETAR CO DO SENSOR MQ135
+
+/********************************************** VARIAVEIS GLOBAIS **********************************************/
+double CO2 = (0);                                                         // VARIAVEL PARA COLETAR CO DO SENSOR MQ135
 float CO = 00.00, NH3 = 00.00, CH3 = 00.00, C2H6O = 00.00, C3H6O = 00.00; // VARIAVEL PARA COLETAR GASES DO SENSOR MQ135
 // float NOX = 00.00, CL2 = 00.00, O3 = 00.00;// VARIAVEL PARA COLETAR GASES DO SENSOR MQ131
 int ID_TEMPO = 0;
@@ -120,6 +97,8 @@ ThingsBoard tb(espClient);
 // STATUS DO SINAL DE WIFI
 int status = WL_IDLE_STATUS;
 
+/****************************************************FUNÇÕES****************************************************/
+
 // FUNÇÃO PARA CONECTAR NA REDE WIFI
 void CONECTAR_WIFI()
 {
@@ -140,7 +119,7 @@ void CONECTAR_WIFI()
   Serial.println(WiFi.localIP());
 }
 
-// FUNÇÃO LÊR TENSÃO
+// FUNÇÃO LER TENSÃO
 void TENSAO(int TIPO)
 {
   TENSAO_CALCULADA = 0;
@@ -162,8 +141,7 @@ void TENSAO(int TIPO)
   TENSAO_CALCULADA = ((((analogRead(TIPO)) * 3.27) / 4096) / (valorR2 / (valorR1 + valorR2))) * tensaoOFFSET;
 }
 
-/****************************************************FUNÇÕES****************************************************/
-// FUNÇÃO LÊ SENSOR MQ135
+// FUNÇÃO LE SENSOR MQ135
 void SENSOR_MQ135()
 {
   MQ135.update(); // ATUALZA OS DADOS, MICROCONTROLADOR FAZ A LEITURA DA TENSÃO NA PORTA ANALOGICA.
@@ -204,7 +182,7 @@ void SENSOR_MQ135()
   C3H6O = MQ135.readSensor(); // LÊ A CONCENTRAÇÃO DE ACETONA EM PPM
 }
 
-// FUNÇÃO LÊ SENSOR MQ131
+// FUNÇÃO LE SENSOR MQ131
 /*
 void SENSOR_MQ131()
 {
@@ -410,7 +388,7 @@ void PEGAR_HORA()
   }
 }
 
-// FUÇÃO ENVIA PARA SERVIDOR DADOS
+// FUNÇÃO ENVIA PARA SERVIDOR DADOS
 void ENVIAR_PARA_SERVIDOR()
 {
 
@@ -571,7 +549,7 @@ void TRATA_ERROS(int PULSOS_LED, int ESPACO_TEMPO)
   }
 }
 
-// FUÇÃO PARA LEITURA E TRATAMENTO DO SENSOR PLUVIOMETRICO
+// FUNÇÃO PARA LEITURA E TRATAMENTO DO SENSOR PLUVIOMETRICO
 void NIVEL_PLUVIOMETRICO()
 {
   if (CONTADOR_PLUVIOMETRICO <= 3600)
@@ -658,7 +636,7 @@ void CALIBRACAO_SENSORES_MQ()
 void MODULO_1_LEITURA()
 {
 
-//*************BME280
+  //*************BME280
   TEMPERATURA = bme.readTemperature();
 
   PRESSAO = bme.readPressure() / 100;
@@ -667,22 +645,22 @@ void MODULO_1_LEITURA()
 
   ALTITUDE = bme.readAltitude(SEALEVELPRESSURE_HPA);
 
-if(PRESSAO==FUNDO_ESCALA_BME280 || UMIDADE==FUNDO_ESCALA_BME280 || ALTITUDE==FUNDO_ESCALA_BME280)
-{
+  if (PRESSAO == FUNDO_ESCALA_BME280 || UMIDADE == FUNDO_ESCALA_BME280 || ALTITUDE == FUNDO_ESCALA_BME280)
+  {
+    Serial.println("");
+    Serial.println("!!!!! -----  *****  ATENCAO SENSOR BME280 MODULO 1 COM PROBLEMA!!! ***** ----- !!!!!");
+    Serial.print("EQUIPAMENO SERA REINICIADO! EM 2 SEGUNDO");
+    TRATA_ERROS(10, 200);
+    ESP.restart();
+  }
+  //**************ULTRAVIOLETA
+  uvLevel = analogRead(SENSOR_ULTRAVIOLETA); // averageAnalogRead(SENSOR_ULTRAVIOLETA, 8);
+
   Serial.println("");
-  Serial.println("!!!!! -----  *****  ATENCAO SENSOR BME280 MODULO 1 COM PROBLEMA!!! ***** ----- !!!!!");
-  Serial.print("EQUIPAMENO SERA REINICIADO! EM 2 SEGUNDO");
-  TRATA_ERROS(10,200);
-  ESP.restart();
-}
-//**************ULTRAVIOLETA
-  uvLevel = averageAnalogRead(SENSOR_ULTRAVIOLETA, 8);
-
-  refLevel = 3.26;
-
-  outputVoltagem = 3.3 / (refLevel * uvLevel); // Use os 3,3V de alimentação no pin referência para um melhor acuidade do valor de saida do sensor
-
-  NIVEL_UV = mapfloat(outputVoltagem, 0.0, 3.3, 0.0, 15.0); // Convert the voltage to a UV intensity level
+  Serial.println(uvLevel);
+  Serial.println("");
+  
+  NIVEL_UV = mapfloat(uvLevel, 0, 4096, 0, 15); // Convert the voltage to a UV intensity level
 
   //******************** GASES
   SENSOR_MQ135(); // LÊ OS GASES NO AMBIENTE MQ-135
@@ -690,27 +668,30 @@ if(PRESSAO==FUNDO_ESCALA_BME280 || UMIDADE==FUNDO_ESCALA_BME280 || ALTITUDE==FUN
   // SENSOR_MQ131(); //LÊ OS GASES NO AMBIENTE MQ-131
 }
 
-
 // FUNÇÃO PARA TESTAR INTERFACE
 void TESTE_INTERFACE()
 {
   digitalWrite(LED_LIGADO, HIGH);
-  delay(5000);
+  Serial.println("LED VERDE - LIGADO");
+  delay(1000);
   digitalWrite(LED_LIGADO, LOW);
   delay(1000);
 
   digitalWrite(LED_VIDA, HIGH);
-  delay(5000);
+  Serial.println("LED LARANJA - VIDA");
+  delay(1000);
   digitalWrite(LED_VIDA, LOW);
   delay(1000);
 
   digitalWrite(LED_WIFI, HIGH);
-  delay(5000);
+  Serial.println("LED AZUL - WIFI");
+  delay(1000);
   digitalWrite(LED_WIFI, LOW);
   delay(1000);
 
   digitalWrite(LED_ERRO, HIGH);
-  delay(5000);
+  Serial.println("LED VERMELHO - ERRO");
+  delay(1000);
   digitalWrite(LED_ERRO, LOW);
   delay(1000);
 
@@ -737,8 +718,6 @@ void setup()
   pinMode(LED_WIFI, OUTPUT); // STATUS LED WIFI
   pinMode(LED_ERRO, OUTPUT); // STATUS LED ERRO
 
-  TESTE_INTERFACE();
-
   digitalWrite(LED_VIDA, LOW);
   digitalWrite(LED_WIFI, LOW);
   digitalWrite(LED_ERRO, LOW);
@@ -758,6 +737,8 @@ void setup()
   Serial.begin(115200);
   if (Serial)
     Serial.println("SERIAL ABERTA!!!");
+
+  TESTE_INTERFACE();
 
   // Defina o modelo matemático para calcular a concentração de PPM e o valor das constantes.
   MQ135.setRegressionMethod(1); //_PPM =  a*ratio^b
@@ -799,7 +780,7 @@ void setup()
 
 void loop()
 {
-  // digitalWrite(LED_LIGADO, HIGH);
+  digitalWrite(LED_LIGADO, HIGH);
   int TEMP_EXEC = 0;
   TEMP_EXEC = millis();
   digitalWrite(LED_VIDA, HIGH);
@@ -839,8 +820,6 @@ void loop()
 
     MODULO_1_LEITURA();
 
-
-
     FREQUENCIA_ABALO += mapfloat(1.15, 0.0, 3.3, 0.0, 10.0);
 
     UMIDADE_SOLO = mapfloat(analogRead(SENSOR_UMIDADE_SOLO_ANALOGICO), 0, 4095, 100, 0);
@@ -868,5 +847,6 @@ void loop()
 
     FREQUENCIA_ABALO = 0;
     digitalWrite(LED_VIDA, LOW);
+    delay(1000);
   }
 }
