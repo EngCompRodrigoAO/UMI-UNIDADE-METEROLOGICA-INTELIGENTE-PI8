@@ -1,3 +1,25 @@
+/*****************************************************************************************************************/
+/*                                        TRABALHO DE CONCLUSÃO DE CURSO                                         */
+/*                              UNIVESP - UNIVERSIDADE VIRTUAL DO ESTADO DE SÃO PAULO                            */
+/*                                        CURSO DE ENGENHARIA DA COMPUTAÇÃO                                      */
+/*                                                SALA 5 - GRUPO 3                                               */
+/*****************************************************************************************************************/
+/*****************************************************************************************************************/
+/*                                                  INTEGRANTES                                                  */
+/*                                      CELSO DE CARVALHO JÚNIOR 1711079                                         */
+/*                                     CLAUDEVAN DA SILVA PEREIRA 1822375                                        */
+/*                                           CLAYTON MOGAMI 1825983                                              */
+/*                                    FELIPE BARROZZI GUARDABASSIO 1821103                                       */
+/*                                      FERNANDO AUGUSTO FRANÇA 1836170                                          */
+/*                                        OSMAR MURARO OKADA 1832750                                             */
+/*                                    RODRIGO DE AVILA OLIVEIRA 1826340                                          */
+/*                                      SÉRGIO LUIZ BARBOSA 1826279                                              */
+/*****************************************************************************************************************/
+/*****************************************************************************************************************/
+/*                                                  ORIENTADOR                                                   */
+/*                                     Prof. Dra.  Thays de Souza João Luiz                                      */
+/*****************************************************************************************************************/
+
 /************************************************** INCLUDES **************************************************/
 #include <Arduino.h>         //BIBLIOTECA COM FUNÇÕES IDE ARDUINO
 #include <WiFi.h>            //BIBLIOTECA COM FUNÇÕES DO WIFI
@@ -218,8 +240,8 @@ void IRAM_ATTR CONTADOR_CHUVA()
   PULSO_PLUVIOMETRICO++;
 }
 
-// função que faz uma média de leituras em umA determinadA porta e retorna a média
-int averageAnalogRead(int pinToRead, byte numberOfReadings) // pinToRead= pino analogico que quer obter a média, numberOfReadings= numero de vezes que deve fazer a leitura
+// FUNÇÃO QUE FAZ UMA MÉDIA DE X LETURAS EM UMA DETERMINADA PORTA E RETORNA A MEDIA DE AMORTECIMENTO DE POSIVEIS RUIDOS.
+int averageAnalogRead(int pinToRead, byte numberOfReadings) // pinToRead= PINO ANALOGICO QUE QUER OBTER A MÉDIA, numberOfReadings= QUANTIDADE DE VEZES QUE SERA LIDO PARA A MÉDIA
 {
   unsigned int runningValue = 0;
 
@@ -231,7 +253,7 @@ int averageAnalogRead(int pinToRead, byte numberOfReadings) // pinToRead= pino a
 }
 
 // FUÇÃO DE MAPA E RETORNA VALOR TRATADO
-float mapfloat(float x, float in_min, float in_max, float out_min, float out_max) // x= valor a ser tatado, in_min= valor minimo de entrada, in_max= valor maximo a ser lido, out_mim= valor minimo da saida, out_max= valor maximo da saida
+float mapfloat(float x, float in_min, float in_max, float out_min, float out_max) // x= VALOR A SER TRATADO, in_min= vVALOR MINIMO DE ENTRADAS, in_max= VALOR MAXIMO A SER LIDO, out_mim= valor minimo da saida, out_max= VALOR MAXIMO DA SAIDA
 {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
@@ -348,7 +370,7 @@ int DIRECAO_VENTO()
   return (POSICAO);
 }
 
-// Cria a  função para zerar os dados constantes no servidor
+// FUNÇÃO PARA RESETAR OS DADOS DO SERVIDOR USADO SOMENTE EM QUANTO ESTA SENDO DEBUGADO O FIRWARE
 void RESETA_SERVER()
 {
   // Carrega as informações para serem enviadas em um lote somente para o servidor
@@ -365,7 +387,7 @@ void RESETA_SERVER()
   Serial.println("SERVIDOR ZERADO.");*/
 }
 
-// Cria a função para pegar a hora pelo Servidor GMT mundial.
+// FUNÇÃO QUE CARREGA O HORA EM UM DETERMINADO SERVIDOR GMT.
 void PEGAR_HORA()
 {
   String MES_TEMP = "";
@@ -456,7 +478,7 @@ void ENVIAR_PARA_SERVIDOR()
   delay(50);
 }
 
-// FUNÇÃO ESCREVE OS DADOS NA SAIDA SERIAL
+// FUNÇÃO ESCREVE OS DADOS NA SAIDA SERIAL PARA ACOMPANHAMENTO DO DEBUG DO HARDWARE
 void ESCREVE_DADOS_SERIAL()
 {
   Serial.print("ID_EQUIPAMENTO: ");
@@ -564,7 +586,7 @@ void NIVEL_PLUVIOMETRICO()
   }
 }
 
-// CALIBRAÇÃO SENSORES MQ
+// CALIBRAÇÃO DOS SENSORES DO TIPO MQ
 void CALIBRACAO_SENSORES_MQ()
 {
   /*****************************  MQ CALIBRAÇÃO ********************************************/
@@ -576,7 +598,7 @@ void CALIBRACAO_SENSORES_MQ()
 
   for (int i = 1; i <= 10; i++)
   {
-    MQ135.update(); // Atualiza os dados, o arduino faz a leitura da tensão no pino analógico.
+    MQ135.update(); // ATUALIZA DADOS, MICROCONTROLADOR FAZ A LEITURA DA PORTA ANALOGICA E TRAZ A TENSÃO NELA CONVERTENDO PARA SINAL DIGITAL DE 12BITS
     // MQ131.update();
 
     calcR0_MQ135 += MQ135.calibrate(RatioMQ135CleanAir);
